@@ -11,6 +11,9 @@ from fastapi import FastAPI, HTTPException, Form
 from fastapi.responses import JSONResponse
 import sqlite3
 import qrcode
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 app = FastAPI(title="Control de Asistencia QR y Celular")
 
@@ -226,9 +229,9 @@ async def verificar_asistencia(data: AttendanceScan):
 # ==========================================
 
 @app.get("/", response_class=HTMLResponse)
-async def admin_panel(request: Request):
-    return templates.TemplateResponse(request, "admin.html", {})
-
-@app.get("/scanner", response_class=HTMLResponse)
-async def scanner_view(request: Request):
-    return templates.TemplateResponse(request, "scanner.html", {})
+def leer_raiz(request: Request):
+    # Ahora la raíz "/" muestra directamente el escáner
+    return templates.TemplateResponse("scanner.html", {"request": request})
+@app.get("/dashboard", response_class=HTMLResponse)
+def ver_dashboard(request: Request):
+    return templates.TemplateResponse("admin.html", {"request": request})
