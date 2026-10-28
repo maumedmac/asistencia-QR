@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#059669">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Control y Registro QR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-6">
+    <div class="max-w-6xl mx-auto space-y-8">
+        
+        <!-- Cabecera -->
+        <header class="bg-slate-900 p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-xl font-bold text-emerald-400"><i class="fa-solid fa-qrcode mr-2"></i> Control de Asistencia</h1>
+                <p class="text-xs text-slate-400 mt-1">Registro de usuarios, generación de QR y monitoreo de entradas en tiempo real.</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-xs bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 text-slate-300 font-mono">Sesión: SESION-001</span>
+                <button onclick="cargarDashboard()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-2 rounded-xl transition shadow-lg shadow-emerald-600/20">
+                    <i class="fa-solid fa-rotate mr-1"></i> Actualizar Datos
+                </button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Columna Izquierda: Registro y Generador QR -->
+            <div class="space-y-6">
+                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+                    <h2 class="text-sm font-semibold text-slate-200 border-b border-slate-800 pb-3">
+                        <i class="fa-solid fa-user-plus mr-2 text-emerald-400"></i> Registrar Asistente
+                    </h2>
+                    
+                    <form id="user-form" onsubmit="registrarUsuario(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Nombre Completo</label>
+                            <input type="text" id="nombre" required placeholder="Ej: Juan Pérez" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Número de Celular (ID)</label>
+                            <input type="text" id="phone" required placeholder="Ej: +59170000000" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 font-mono">
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm py-2.5 rounded-xl transition shadow-lg shadow-emerald-600/20">
+                            Registrar y Generar QR
+                        </button>
+                    </form>
+                    
+                    <div id="response-msg" class="hidden text-xs text-center p-3 rounded-xl border"></div>
+                </div>
+
+                <!-- Contenedor del QR Generado -->
+                <div id="qr-container" class="hidden bg-slate-900 p-6 rounded-2xl border border-slate-800 text-center space-y-4">
+                    <h2 class="text-xs font-semibold text-slate-300">QR para: <span id="qr-username" class="text-emerald-400"></span></h2>
+                    <div class="bg-white p-3 inline-block rounded-xl shadow-md">
+                        <img id="qr-image" src="" alt="Código QR" class="w-40 h-40 mx-auto">
+                    </div>
+                    <div>
+                        <a id="download-btn" href="" download="codigo-qr.png" class="inline-block bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded-xl border border-slate-700 transition">
+                            <i class="fa-solid fa-download mr-1"></i> Descargar Imagen QR
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Dashboard de Asistencia -->
+            <div class="lg:col-span-2 bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4 flex flex-col">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <h2 class="text-sm font-semibold text-slate-200">
+                        <i class="fa-solid fa-chart-pie mr-2 text-emerald-400"></i> Estado de Asistentes en Tiempo Real
+                    </h2>
+                    <span id="counter-badge" class="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded-full font-mono">0 Asistentes</span>
+                </div>
+
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                            <tr>
+                                <th class="p-3">Celular</th>
+                                <th class="p-3">Nombre</th>
+                                <th class="p-3">Estado</th>
+                                <th class="p-3">Hora de Entrada</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body" class="divide-y divide-slate-800">
+                            <tr>
+                                <td colspan="4" class="text-center p-6 text-slate-500">Cargando registros...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        async function cargarDashboard() {
+    try {
+        const response = await fetch('/api/dashboard-data?session_id=SESION-001');
+        const data = await response.json();
+        
+        const tbody = document.getElementById('users-table-body');
+        tbody.innerHTML = '';
+        
+        let enteredCount = 0;
+
+        if (data.users.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-slate-500">No hay usuarios registrados todavía.</td></tr>`;
+            document.getElementById('counter-badge').textContent = `0 / 0 Asistentes`;
+            return;
+        }
+
+        data.users.forEach(user => {
+            if (user.status === 'Entró') enteredCount++;
+            
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-800/50 transition";
+            
+            const statusBadge = user.status === 'Entró' 
+                ? `<span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full font-medium">Entró</span>`
+                : `<span class="bg-slate-800 text-slate-400 border border-slate-700 px-2.5 py-1 rounded-full">Pendiente</span>`;
+
+            // Construir enlace directo a la API del QR usando el número de celular
+            const qrUrl = `/api/qr/${encodeURIComponent(user.phone)}`;
+
+            tr.innerHTML = `
+                <td class="p-3 font-mono text-slate-300">${user.phone}</td>
+                <td class="p-3 font-medium text-slate-200">${user.name}</td>
+                <td class="p-3">${statusBadge}</td>
+                <td class="p-3 text-slate-400 font-mono">${user.timestamp}</td>
+                <td class="p-3 text-right">
+                    <a href="${qrUrl}" download="QR_${user.phone}.png" class="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                        <i class="fa-solid fa-qrcode text-emerald-400"></i>
+                        <span>Descargar QR</span>
+                    </a>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('counter-badge').textContent = `${enteredCount} de ${data.users.length} Ingresados`;
+    } catch (err) {
+        console.error("Error al cargar el dashboard:", err);
+    }
+}
+
+        async function registrarUsuario(event) {
+            event.preventDefault();
+            const name = document.getElementById('nombre').value;
+            const phone = document.getElementById('phone').value;
+            const msgBox = document.getElementById('response-msg');
+            const qrContainer = document.getElementById('qr-container');
+
+            msgBox.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/usuarios', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: phone, name: name })
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    msgBox.className = "text-xs text-center p-3 rounded-xl border bg-emerald-500/10 text-emerald-300 border-emerald-500/30";
+                    msgBox.textContent = result.message;
+                    msgBox.classList.remove('hidden');
+
+                    // Mostrar QR generado
+                    const qrUrl = `/api/qr/${encodeURIComponent(phone)}`;
+                    document.getElementById('qr-username').textContent = name;
+                    document.getElementById('qr-image').src = qrUrl;
+                    document.getElementById('download-btn').href = qrUrl;
+                    qrContainer.classList.remove('hidden');
+
+                    // Refrescar tabla del dashboard
+                    cargarDashboard();
+                } else {
+                    throw new Error(result.detail || "Error al registrar");
+                }
+            } catch (err) {
+                msgBox.className = "text-xs text-center p-3 rounded-xl border bg-rose-500/10 text-rose-300 border-rose-500/30";
+                msgBox.textContent = "❌ " + err.message;
+                msgBox.classList.remove('hidden');
+            }
+        }
+
+        // Cargar datos al iniciar la página
+        document.addEventListener('DOMContentLoaded', cargarDashboard);
+    </script>
+</body>
+</html>

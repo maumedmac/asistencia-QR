@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#059669"> 
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escáner de Asistencia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between p-4">
+
+    <!-- Cabecera -->
+    <header class="bg-slate-900 p-4 rounded-2xl border border-slate-800 text-center">
+        <h1 class="text-lg font-bold text-emerald-400"><i class="fa-solid fa-camera mr-2"></i> Escáner de Asistencia</h1>
+        <p class="text-xs text-slate-400 mt-1">Apunta la cámara al código QR del celular del asistente</p>
+    </header>
+
+    <!-- Contenedor de la Cámara -->
+    <main class="max-w-md mx-auto w-full my-auto space-y-4">
+        <div class="bg-slate-900 p-3 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+            <div id="reader" class="rounded-xl overflow-hidden"></div>
+        </div>
+
+        <!-- Alerta Dinámica (Azul / Rojo) -->
+        <div id="alert-box" class="hidden p-4 rounded-2xl border text-center transition-all duration-300">
+            <span id="alert-icon" class="text-2xl mb-1 block"></span>
+            <h2 id="alert-title" class="font-bold text-sm"></h2>
+            <p id="alert-text" class="text-xs mt-1 text-slate-300"></p>
+        </div>
+    </main>
+
+    <!-- Pie / Enlace al Panel -->
+    <footer class="text-center pb-2">
+        <a href="/" class="text-xs text-slate-400 hover:text-emerald-400 transition underline">
+            <i class="fa-solid fa-arrow-left mr-1"></i> Volver al Panel de Control
+        </a>
+    </footer>
+
+    <script>
+        let html5QrCode;
+        let isProcessing = false;
+        const sessionId = "SESION-001";
+
+        function showAlert(status, title, message) {
+            const alertBox = document.getElementById('alert-box');
+            const alertIcon = document.getElementById('alert-icon');
+            const alertTitle = document.getElementById('alert-title');
+            const alertText = document.getElementById('alert-text');
+            
+            // Limpiar clases previas
+            alertBox.className = "p-4 rounded-2xl border text-center transition-all duration-300 shadow-lg";
+
+            if (status === 'success') {
+                // AZUL: Primera vez / Entrando
+                alertBox.classList.add('bg-blue-600/20', 'border-blue-500/50', 'text-blue-200');
+                alertIcon.innerHTML = '✅';
+            } else {
+                // ROJO: Duplicado o No existe
+                alertBox.classList.add('bg-rose-600/20', 'border-rose-500/50', 'text-rose-200');
+                alertIcon.innerHTML = '❌';
+            }
+
+            alertTitle.textContent = title;
+            alertText.textContent = message;
+            alertBox.classList.remove('hidden');
+
+            // Ocultar alerta automáticamente después de 2 segundos para seguir escaneando rápido
+            setTimeout(() => {
+                alertBox.classList.add('hidden');
+            }, 2000);
+        }
+
+        async function onScanSuccess(decodedText) {
+            if (isProcessing) return;
+            isProcessing = true;
+
+            try {
+                const response = await fetch('/api/asistencia', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId, phone: decodedText })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showAlert('success', '¡ENTRANDO!', result.message);
+                } else if (result.status === 'already_entered') {
+                    showAlert('duplicate', 'YA HA ENTRADO', result.message);
+                } else {
+                    showAlert('not_exists', 'CLIENTE NO EXISTE', result.message);
+                }
+            } catch (err) {
+                showAlert('error', 'ERROR DE RED', 'No se pudo comunicar con el servidor.');
+            }
+
+            // Liberar el escaneo rápidamente para permitir flujo continuo
+            setTimeout(() => {
+                isProcessing = false;
+            }, 1200);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 15, qrbox: { width: 250, height: 250 } },
+                onScanSuccess,
+                (error) => {}
+            ).catch(err => {
+                alert("No se pudo iniciar la cámara. Asegúrate de dar permisos HTTPS.");
+            });
+        });
+    </script>
+</body>
+</html>

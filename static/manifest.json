@@ -1,0 +1,15 @@
+{
+  "name": "Control de Asistencia QR",
+  "short_name": "AsistenciaQR",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030712",
+  "theme_color": "#059669",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1077/1077114.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
