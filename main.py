@@ -6,9 +6,56 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Form
+from fastapi.responses import JSONResponse
+import sqlite3
 import qrcode
 
 app = FastAPI(title="Control de Asistencia QR y Celular")
+
+# (Asumiendo que ya tienes configurada tu app y tu base de datos attendance.db)
+
+@app.post("/api/consultar")
+def consultar_asistencia(codigo: str = Form(...)):
+    conn = sqlite3.connect("attendance.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM asistentes WHERE codigo = ?", (codigo,))
+    asistente = cursor.fetchone()
+    conn.close()
+
+    if not asistente:
+        return JSONResponse(status_code=404, content={"status": "not_found", "message": "El código no existe"})
+    
+    # Supongamos que el campo 'estado' o 'ingresado' está en la columna 2 o similar
+    # Devuelve el estado actual del asistente
+    ya_ingreso = asistente[2] # 1 si ya entró, 0 si no
+    return {
+        "status": "success",
+        "nombre": asistente[1],
+        "codigo": asistente[0],
+        "ya_ingreso": bool(ya_ingreso)
+    }
+
+@app.post("/api/registrar")
+def registrar_asistencia(codigo: str = Form(...)):
+    conn = sqlite3.connect("attendance.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM asistentes WHERE codigo = ?", (codigo,))
+    asistente = cursor.fetchone()
+
+    if not asistente:
+        conn.close()
+        return JSONResponse(status_code=404, content={"status": "not_found", "message": "El código no existe"})
+
+    if asistente[2] == 1: # Ya había ingresado (Duplicado)
+        conn.close()
+        return JSONResponse(status_code=400, content={"status": "duplicate", "message": "¡Ya está dentro! (Acceso duplicado)"})
+
+    # Registrar la llegada (cambiar estado a 1)
+    cursor.execute("UPDATE asistentes SET ingresado = 1 WHERE codigo = ?", (codigo,))
+    conn.commit()
+    conn.close()
+    return {"status": "registered", "message": "¡Ingreso registrado con éxito!", "nombre": asistente[1]}
 
 # Habilitar CORS
 app.add_middleware(
