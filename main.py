@@ -1,6 +1,7 @@
 import sqlite3
 import io
 from datetime import datetime
+from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -67,6 +68,8 @@ app.add_middleware(
 )
 
 # Configurar motor de plantillas Jinja2 (requiere una carpeta llamada 'templates')
+# Añade esto junto a la configuración de tus templates
+app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # Inicializar Base de Datos SQLite

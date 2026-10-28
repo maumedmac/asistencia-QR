@@ -155,5 +155,14 @@
         // Arrancar cámara al cargar la página
         window.addEventListener("load", iniciarCamara);
     </script>
+    <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker registrado con éxito', reg))
+        .catch(err => console.log('Error al registrar Service Worker', err));
+    });
+  }
+</script>
 </body>
 </html>
